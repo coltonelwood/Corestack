@@ -26,9 +26,13 @@ AGENT_KEY_MAP: dict[str, str] = {
     "Content Writer": "content_writer",
     "Research Analyst": "research_analyst",
     "Ads Manager": "ads_manager",
-    "Analytics Agent": "analytics",
+    "Analytics Agent": "analytics_agent",
     "Operations Agent": "operations",
     "Outreach Agent": "outreach",
+    # Core agent layer
+    "Opportunity Agent": "opportunity",
+    "Decision Agent": "decision",
+    "Execution Agent": "execution",
 }
 
 

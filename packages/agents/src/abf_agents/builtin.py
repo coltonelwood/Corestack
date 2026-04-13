@@ -1,6 +1,20 @@
-"""Built-in agent implementations."""
+"""Built-in agent implementations.
+
+Imports the core agent layer (agents/) and keeps simple wrapper agents
+for backward compatibility with the existing execute router.
+"""
 
 from __future__ import annotations
+
+# Register the four core agents
+from abf_agents.agents import (  # noqa: F401
+    OpportunityAgent,
+    DecisionAgent,
+    ExecutionAgent,
+    AnalyticsAgent,
+)
+
+# ── Simple wrapper agents (backward compat) ──────────────────
 
 from abf_agents.base import BaseAgent, AgentContext, AgentResult
 from abf_agents.registry import register
@@ -13,16 +27,19 @@ class ContentWriterAgent(BaseAgent):
     description = "Generates product descriptions, blog posts, and marketing copy."
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
-        from abf_ai import complete
+        from abf_ai.router import route_ai_task
 
-        task_type = ctx.payload.get("task", "product_description")
-        prompt = ctx.payload.get("prompt", f"Generate content for task: {task_type}")
+        content_type = ctx.payload.get("content_type", "content_generation")
+        task_map = {
+            "ad_copy": "ad_copy",
+            "landing_page": "landing_page_copy",
+            "product_description": "content_generation",
+        }
+        ai_task = task_map.get(content_type, "content_generation")
 
-        result = await complete(prompt)
-
+        result = await route_ai_task(ai_task, ctx.payload)
         return AgentResult(
-            success=True,
-            output={"text": result.text, "task_type": task_type},
+            output=result.data,
             tokens_used=result.tokens_used,
             cost_cents=result.cost_cents,
         )
@@ -35,16 +52,15 @@ class ResearchAnalystAgent(BaseAgent):
     description = "Performs market research, competitor analysis, and trend identification."
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
-        from abf_ai import complete
+        from abf_ai.router import route_ai_task
 
-        topic = ctx.payload.get("topic", "market analysis")
-        prompt = f"Conduct a brief research analysis on: {topic}"
-
-        result = await complete(prompt)
-
+        result = await route_ai_task("opportunity_scoring", {
+            "opportunity": ctx.payload.get("topic", "market analysis"),
+            "market_data": ctx.payload.get("market_data", ""),
+            "our_strengths": ctx.payload.get("our_strengths", ""),
+        })
         return AgentResult(
-            success=True,
-            output={"analysis": result.text, "topic": topic},
+            output=result.data,
             tokens_used=result.tokens_used,
             cost_cents=result.cost_cents,
         )
@@ -57,38 +73,11 @@ class AdsManagerAgent(BaseAgent):
     description = "Manages ad campaigns, optimises creative, and analyses performance."
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
-        from abf_ai import complete
+        from abf_ai.router import route_ai_task
 
-        action = ctx.payload.get("action", "optimize")
-        prompt = f"Ad management task — action: {action}. Provide recommendations."
-
-        result = await complete(prompt)
-
+        result = await route_ai_task("campaign_scaling", ctx.payload)
         return AgentResult(
-            success=True,
-            output={"recommendations": result.text, "action": action},
-            tokens_used=result.tokens_used,
-            cost_cents=result.cost_cents,
-        )
-
-
-@register
-class AnalyticsAgent(BaseAgent):
-    name = "analytics"
-    agent_type = "analytics"
-    description = "Compiles KPI reports and performance dashboards."
-
-    async def execute(self, ctx: AgentContext) -> AgentResult:
-        from abf_ai import complete
-
-        report_type = ctx.payload.get("report_type", "weekly")
-        prompt = f"Generate a {report_type} performance report summary."
-
-        result = await complete(prompt)
-
-        return AgentResult(
-            success=True,
-            output={"report": result.text, "report_type": report_type},
+            output=result.data,
             tokens_used=result.tokens_used,
             cost_cents=result.cost_cents,
         )
@@ -101,16 +90,15 @@ class OperationsAgent(BaseAgent):
     description = "Handles inventory forecasting, logistics, and operational tasks."
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
-        from abf_ai import complete
+        from abf_ai.router import route_ai_task
 
-        task = ctx.payload.get("task", "inventory_forecast")
-        prompt = f"Operations task: {task}. Provide analysis and recommendations."
-
-        result = await complete(prompt)
-
+        result = await route_ai_task("decisioning", {
+            "context": ctx.payload.get("task", "operations task"),
+            "options": ctx.payload.get("options", []),
+            "constraints": ctx.payload.get("constraints", ""),
+        })
         return AgentResult(
-            success=True,
-            output={"analysis": result.text, "task": task},
+            output=result.data,
             tokens_used=result.tokens_used,
             cost_cents=result.cost_cents,
         )
@@ -123,16 +111,17 @@ class OutreachAgent(BaseAgent):
     description = "Manages influencer outreach and partnership communications."
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
-        from abf_ai import complete
+        from abf_ai.router import route_ai_task
 
-        campaign = ctx.payload.get("campaign", "outreach")
-        prompt = f"Draft an influencer outreach strategy for campaign: {campaign}"
-
-        result = await complete(prompt)
-
+        result = await route_ai_task("content_generation", {
+            "product_name": ctx.payload.get("campaign", "outreach"),
+            "content_type": "outreach_strategy",
+            "brand_voice": "Professional and friendly",
+            "audience": "Influencers and content creators",
+            "length": "200-300 words",
+        })
         return AgentResult(
-            success=True,
-            output={"strategy": result.text, "campaign": campaign},
+            output=result.data,
             tokens_used=result.tokens_used,
             cost_cents=result.cost_cents,
         )
