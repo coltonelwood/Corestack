@@ -39,11 +39,13 @@ async def lifespan(app: FastAPI):
     logger.info("ABF API shutting down")
 
 
+_is_prod = settings.environment == "production"
+
 app = FastAPI(
     title="Autonomous Business Factory API",
     version="0.2.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
     lifespan=lifespan,
 )
 

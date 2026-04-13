@@ -12,11 +12,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
 
     # Server
+    port: int = 8000
     cors_origins: str = "http://localhost:3000"
     log_level: str = "INFO"
     environment: str = "development"
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
 settings = Settings()

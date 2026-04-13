@@ -5,8 +5,11 @@
     "dev": "turbo dev --filter=@abf/dashboard",
     "dev:api": "cd apps/api && uvicorn abf_api.main:app --reload --port 8000",
     "build": "turbo build",
+    "build:dashboard": "turbo build --filter=@abf/dashboard",
+    "start:api": "cd apps/api && uvicorn abf_api.main:app --host 0.0.0.0 --port ${PORT:-8000}",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "check": "turbo typecheck && turbo lint"
   },
   "devDependencies": {
     "turbo": "^2.1.0"
