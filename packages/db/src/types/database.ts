@@ -441,6 +441,142 @@ export interface Database {
           },
         ];
       };
+      workflow_runs: {
+        Row: {
+          id: string;
+          business_id: string;
+          workflow_type: string;
+          name: string;
+          status: string;
+          input_payload: Json;
+          output_payload: Json | null;
+          current_step: string | null;
+          total_steps: number;
+          completed_steps: number;
+          failed_steps: number;
+          total_tokens: number;
+          total_cost_cents: number;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          workflow_type: string;
+          name: string;
+          status?: string;
+          input_payload?: Json;
+          output_payload?: Json | null;
+          current_step?: string | null;
+          total_steps?: number;
+          completed_steps?: number;
+          failed_steps?: number;
+          total_tokens?: number;
+          total_cost_cents?: number;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          workflow_type?: string;
+          name?: string;
+          status?: string;
+          input_payload?: Json;
+          output_payload?: Json | null;
+          current_step?: string | null;
+          total_steps?: number;
+          completed_steps?: number;
+          failed_steps?: number;
+          total_tokens?: number;
+          total_cost_cents?: number;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflow_step_runs: {
+        Row: {
+          id: string;
+          workflow_run_id: string;
+          step_key: string;
+          step_name: string;
+          status: string;
+          agent_name: string | null;
+          input_payload: Json;
+          output_payload: Json | null;
+          error_message: string | null;
+          approval_id: string | null;
+          tokens_used: number;
+          cost_cents: number;
+          duration_ms: number;
+          created_at: string;
+          updated_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workflow_run_id: string;
+          step_key: string;
+          step_name: string;
+          status?: string;
+          agent_name?: string | null;
+          input_payload?: Json;
+          output_payload?: Json | null;
+          error_message?: string | null;
+          approval_id?: string | null;
+          tokens_used?: number;
+          cost_cents?: number;
+          duration_ms?: number;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          workflow_run_id?: string;
+          step_key?: string;
+          step_name?: string;
+          status?: string;
+          agent_name?: string | null;
+          input_payload?: Json;
+          output_payload?: Json | null;
+          error_message?: string | null;
+          approval_id?: string | null;
+          tokens_used?: number;
+          cost_cents?: number;
+          duration_ms?: number;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_step_runs_workflow_run_id_fkey";
+            columns: ["workflow_run_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

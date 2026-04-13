@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Settings,
   Zap,
+  Workflow,
 } from "lucide-react";
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Campaigns", href: "/dashboard/campaigns", icon: Megaphone },
   { name: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
   { name: "Agent Runs", href: "/dashboard/agent-runs", icon: Bot },
+  { name: "Workflows", href: "/dashboard/workflows", icon: Workflow },
   { name: "Approvals", href: "/dashboard/approvals", icon: ShieldCheck },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

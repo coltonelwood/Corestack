@@ -1,7 +1,7 @@
-"""Workflow endpoints — define, trigger, and monitor workflows.
+"""Workflow endpoints — trigger, monitor, resume product launch workflows.
 
-Workflows are DAGs of agent steps. The backend orchestrates execution,
-records results per step, and returns a consolidated summary.
+Provides both the generic workflow trigger (inline steps) and the
+specific product launch workflow with persistent DB-backed state.
 """
 
 import logging
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from supabase import Client
 
 from abf_api.deps.supabase import get_supabase
-from abf_api.errors import ABFError
+from abf_api.errors import ABFError, NotFoundError
 from abf_api.responses import ok, ok_list
 from abf_api.services.audit import log_event
 
@@ -22,6 +22,22 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 
 # ── Schemas ──────────────────────────────────────────────────
+
+class ProductLaunchRequest(BaseModel):
+    business_id: str
+    product_name: str
+    product_description: str = ""
+    category: str = ""
+    price: str = ""
+    target_audience: str = ""
+    brand_voice: str = "Professional and approachable"
+    channel: str = "meta"
+    budget_cents: int = 0
+    market_data: str = ""
+    our_strengths: str = ""
+
+class ResumeRequest(BaseModel):
+    workflow_run_id: str
 
 class WorkflowStepInput(BaseModel):
     id: str
@@ -35,119 +51,124 @@ class WorkflowTriggerRequest(BaseModel):
     business_id: str
     steps: list[WorkflowStepInput]
 
-class StepResultResponse(BaseModel):
-    step_id: str
-    success: bool
-    output: dict[str, Any] = Field(default_factory=dict)
-    error: str | None = None
-    tokens_used: int = 0
-    cost_cents: int = 0
-    duration_ms: int = 0
 
-class WorkflowResultResponse(BaseModel):
-    name: str
-    business_id: str
-    total_steps: int
-    completed_steps: int
-    failed_steps: int
-    total_tokens: int
-    total_cost_cents: int
-    total_duration_ms: int
-    steps: list[StepResultResponse]
+# ═══════════════════════════════════════════════════════════
+#  Product Launch Workflow
+# ═══════════════════════════════════════════════════════════
 
-
-# ── Endpoints ────────────────────────────────────────────────
-
-@router.post("/trigger")
-async def trigger_workflow(
-    body: WorkflowTriggerRequest,
+@router.post("/product-launch")
+async def trigger_product_launch(
+    body: ProductLaunchRequest,
     db: Client = Depends(get_supabase),
 ):
-    """Trigger a workflow: define steps inline and execute immediately."""
-    # Import here to avoid circular deps and lazy-load agent registry
-    import abf_agents.builtin  # noqa: F401
-    from abf_workflows import WorkflowEngine, Workflow, WorkflowStep
+    """Trigger the full product launch workflow.
 
-    wf_steps = [
-        WorkflowStep(
-            id=s.id,
-            name=s.name,
-            agent_name=s.agent_name,
-            payload=s.payload,
-            depends_on=s.depends_on,
-        )
-        for s in body.steps
-    ]
-
-    workflow = Workflow(
-        id="runtime",
-        name=body.name,
-        business_id=body.business_id,
-        steps=wf_steps,
-    )
-
-    logger.info(
-        "Workflow triggered: %s (%d steps) for business %s",
-        body.name, len(wf_steps), body.business_id,
-    )
-
-    engine = WorkflowEngine(workflow)
+    Steps: opportunity analysis → decision scoring → generate 4 content assets
+    → create campaign draft → risk check (may pause for approval) → finalize.
+    """
+    from abf_workflows.definitions.product_launch import trigger
 
     try:
-        results = await engine.run()
+        result = await trigger(db, body.business_id, body.model_dump())
     except Exception as exc:
-        logger.exception("Workflow execution failed: %s", exc)
+        logger.exception("Product launch workflow failed: %s", exc)
         raise ABFError(f"Workflow failed: {exc}", status_code=500, code="WORKFLOW_ERROR")
-
-    completed = [r for r in results if r.success]
-    failed = [r for r in results if not r.success]
-
-    response = WorkflowResultResponse(
-        name=body.name,
-        business_id=body.business_id,
-        total_steps=len(wf_steps),
-        completed_steps=len(completed),
-        failed_steps=len(failed),
-        total_tokens=sum(r.tokens_used for r in results),
-        total_cost_cents=sum(r.cost_cents for r in results),
-        total_duration_ms=sum(r.duration_ms for r in results),
-        steps=[
-            StepResultResponse(
-                step_id=r.step_id,
-                success=r.success,
-                output=r.output,
-                error=r.error,
-                tokens_used=r.tokens_used,
-                cost_cents=r.cost_cents,
-                duration_ms=r.duration_ms,
-            )
-            for r in results
-        ],
-    )
 
     log_event(
         db,
         actor="api",
         action="workflow_trigger",
         entity_type="workflow",
+        entity_id=result.get("workflow_run_id"),
         business_id=body.business_id,
         diff={
-            "name": body.name,
-            "total_steps": len(wf_steps),
-            "completed": len(completed),
-            "failed": len(failed),
-            "total_tokens": response.total_tokens,
-            "total_cost_cents": response.total_cost_cents,
+            "type": "product_launch",
+            "product_name": body.product_name,
+            "status": result.get("status"),
         },
     )
 
-    logger.info(
-        "Workflow completed: %s — %d/%d steps succeeded (tokens=%d, cost=%dc)",
-        body.name, len(completed), len(wf_steps),
-        response.total_tokens, response.total_cost_cents,
+    return ok(result)
+
+
+@router.post("/resume")
+async def resume_workflow(
+    body: ResumeRequest,
+    db: Client = Depends(get_supabase),
+):
+    """Resume a paused workflow after its approval has been granted."""
+    # Load the workflow to determine its type
+    wf = db.table("workflow_runs").select("workflow_type").eq("id", body.workflow_run_id).maybe_single().execute()
+    if not wf.data:
+        raise NotFoundError("Workflow run", body.workflow_run_id)
+
+    wf_type = wf.data["workflow_type"]
+
+    if wf_type == "product_launch":
+        from abf_workflows.definitions.product_launch import resume
+        try:
+            result = await resume(db, body.workflow_run_id)
+        except ValueError as exc:
+            raise ABFError(str(exc), code="WORKFLOW_RESUME_ERROR")
+        except Exception as exc:
+            logger.exception("Workflow resume failed: %s", exc)
+            raise ABFError(f"Resume failed: {exc}", status_code=500, code="WORKFLOW_ERROR")
+    else:
+        raise ABFError(f"Unsupported workflow type: {wf_type}", code="UNKNOWN_WORKFLOW")
+
+    log_event(
+        db,
+        actor="api",
+        action="workflow_resume",
+        entity_type="workflow",
+        entity_id=body.workflow_run_id,
+        diff={"status": result.get("status")},
     )
 
-    return ok(response.model_dump())
+    return ok(result)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Workflow status and listing
+# ═══════════════════════════════════════════════════════════
+
+@router.get("")
+def list_workflow_runs(
+    business_id: str | None = None,
+    status: str | None = None,
+    workflow_type: str | None = None,
+    db: Client = Depends(get_supabase),
+):
+    """List all workflow runs with optional filters."""
+    q = db.table("workflow_runs").select("*").order("created_at", desc=True)
+    if business_id:
+        q = q.eq("business_id", business_id)
+    if status:
+        q = q.eq("status", status)
+    if workflow_type:
+        q = q.eq("workflow_type", workflow_type)
+    return ok_list(q.execute().data)
+
+
+@router.get("/{workflow_run_id}")
+def get_workflow_run(workflow_run_id: str, db: Client = Depends(get_supabase)):
+    """Get a workflow run with all its step details."""
+    wf = db.table("workflow_runs").select("*").eq("id", workflow_run_id).maybe_single().execute()
+    if not wf.data:
+        raise NotFoundError("Workflow run", workflow_run_id)
+
+    steps = (
+        db.table("workflow_step_runs")
+        .select("*")
+        .eq("workflow_run_id", workflow_run_id)
+        .order("created_at")
+        .execute()
+    )
+
+    return ok({
+        **wf.data,
+        "steps": steps.data or [],
+    })
 
 
 @router.get("/agents")
@@ -165,3 +186,62 @@ def list_available_agents():
         }
         for cls in agents.values()
     ])
+
+
+# ═══════════════════════════════════════════════════════════
+#  Generic inline workflow trigger (existing)
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/trigger")
+async def trigger_inline_workflow(
+    body: WorkflowTriggerRequest,
+    db: Client = Depends(get_supabase),
+):
+    """Trigger a generic workflow with inline step definitions."""
+    import abf_agents.builtin  # noqa: F401
+    from abf_workflows import WorkflowEngine, Workflow, WorkflowStep
+
+    wf_steps = [
+        WorkflowStep(
+            id=s.id, name=s.name, agent_name=s.agent_name,
+            payload=s.payload, depends_on=s.depends_on,
+        )
+        for s in body.steps
+    ]
+
+    workflow = Workflow(
+        id="runtime", name=body.name,
+        business_id=body.business_id, steps=wf_steps,
+    )
+
+    engine = WorkflowEngine(workflow)
+
+    try:
+        results = await engine.run()
+    except Exception as exc:
+        logger.exception("Inline workflow failed: %s", exc)
+        raise ABFError(f"Workflow failed: {exc}", status_code=500, code="WORKFLOW_ERROR")
+
+    completed = [r for r in results if r.success]
+    failed = [r for r in results if not r.success]
+
+    return ok({
+        "name": body.name,
+        "total_steps": len(wf_steps),
+        "completed_steps": len(completed),
+        "failed_steps": len(failed),
+        "total_tokens": sum(r.tokens_used for r in results),
+        "total_cost_cents": sum(r.cost_cents for r in results),
+        "steps": [
+            {
+                "step_id": r.step_id,
+                "success": r.success,
+                "output": r.output,
+                "error": r.error,
+                "tokens_used": r.tokens_used,
+                "cost_cents": r.cost_cents,
+                "duration_ms": r.duration_ms,
+            }
+            for r in results
+        ],
+    })
