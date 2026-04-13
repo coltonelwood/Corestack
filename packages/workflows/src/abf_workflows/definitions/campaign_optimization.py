@@ -432,10 +432,11 @@ def _log_recommendation(
     db: Any,
     business_id: str,
 ) -> StepOutcome:
-    """Write the full recommendation to audit_logs."""
+    """Write the recommendation to audit_logs and save to memory."""
     apply_result = prior_outputs.get("apply_or_approve", {})
     analysis = prior_outputs.get("analyze_metrics", {})
 
+    # Audit log
     try:
         db.table("audit_logs").insert({
             "business_id": business_id,
@@ -458,9 +459,23 @@ def _log_recommendation(
     except Exception:
         logger.exception("Failed to log campaign recommendation")
 
+    # Save campaign pattern to memory for future decisions
+    from abf_ai.memory import save_campaign_pattern
+    save_campaign_pattern(
+        db,
+        business_id=business_id,
+        campaign_name=analysis.get("campaign_name", ""),
+        channel=analysis.get("channel", ""),
+        decision=apply_result.get("decision", "hold"),
+        roas=analysis.get("roas", 0),
+        cpa_cents=analysis.get("cpa_cents", 0),
+        confidence=apply_result.get("confidence", 0),
+        reason=apply_result.get("reason", ""),
+    )
+
     return StepOutcome(
         success=True,
-        output={"logged": True, "recommendation": apply_result},
+        output={"logged": True, "memory_saved": True, "recommendation": apply_result},
     )
 
 

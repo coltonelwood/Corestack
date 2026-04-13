@@ -74,6 +74,22 @@ class DecisionAgent(BaseAgent):
         inp = DecisionInput.model_validate(ctx.payload)
         task_type = DECISION_TYPE_TO_TASK.get(inp.decision_type, "decisioning")
 
+        # ── Recall past learnings ────────────────────────────
+        memory_context = ""
+        if ctx.db:
+            ops = DBOps(ctx.db)
+            memory_context = ops.recall_decisions(
+                business_id=ctx.business_id,
+                decision_type=inp.decision_type,
+            )
+            if inp.decision_type == "scale" and inp.channel:
+                campaign_memory = ops.recall_campaign_patterns(
+                    business_id=ctx.business_id,
+                    channel=inp.channel,
+                )
+                if campaign_memory:
+                    memory_context = f"{memory_context}\n\n{campaign_memory}".strip()
+
         # Build the right payload based on decision type
         if inp.decision_type == "scale":
             ai_payload = {
@@ -100,6 +116,10 @@ class DecisionAgent(BaseAgent):
                 "options": inp.options or [],
                 "constraints": inp.constraints,
             }
+
+        # Inject memory context into the AI payload
+        if memory_context:
+            ai_payload["prior_learnings"] = memory_context
 
         ai_result = await route_ai_task(task_type, ai_payload)
 
@@ -141,12 +161,28 @@ class DecisionAgent(BaseAgent):
                 risk_level, confidence, aid,
             )
 
+        # ── Save decision to memory ──────────────────────────
+        if ctx.db:
+            from abf_ai.memory import save_decision_outcome
+            save_decision_outcome(
+                ctx.db,
+                business_id=ctx.business_id,
+                decision_type=inp.decision_type,
+                decision=decision,
+                outcome="success",
+                confidence=confidence,
+                reason=ai_result.data.get("reason", ""),
+                context=ai_payload,
+                agent_name=self.name,
+            )
+
         return AgentResult(
             output={
                 "decision_type": inp.decision_type,
                 "ai_task_type": task_type,
                 **ai_result.data,
                 "approvals_created": approvals_created,
+                "memory_context_used": bool(memory_context),
             },
             tokens_used=ai_result.tokens_used,
             cost_cents=ai_result.cost_cents,

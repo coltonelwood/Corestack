@@ -229,3 +229,41 @@ class DBOps:
         """Fetch all products for a business."""
         res = self._db.table("products").select("*").eq("business_id", business_id).execute()
         return res.data or []
+
+    # ── Memory helpers ───────────────────────────────────────
+
+    def save_memory(
+        self,
+        *,
+        business_id: str,
+        agent_name: str,
+        namespace: str,
+        key: str,
+        entry: Any,
+    ) -> str | None:
+        """Save a memory entry via abf_ai.memory.save."""
+        from abf_ai.memory import save
+        return save(
+            self._db,
+            business_id=business_id,
+            agent_name=agent_name,
+            namespace=namespace,
+            key=key,
+            entry=entry,
+        )
+
+    def recall_decisions(self, *, business_id: str, decision_type: str) -> str:
+        """Recall past decisions formatted for AI prompt injection."""
+        from abf_ai.memory import recall_relevant_decisions
+        return recall_relevant_decisions(
+            self._db, business_id=business_id, decision_type=decision_type,
+        )
+
+    def recall_campaign_patterns(
+        self, *, business_id: str, channel: str | None = None,
+    ) -> str:
+        """Recall campaign patterns formatted for AI prompt injection."""
+        from abf_ai.memory import recall_campaign_patterns
+        return recall_campaign_patterns(
+            self._db, business_id=business_id, channel=channel,
+        )

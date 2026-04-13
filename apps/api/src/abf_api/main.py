@@ -13,6 +13,7 @@ from abf_api.routers import (
     businesses,
     products,
     campaigns,
+    memory as memory_router,
     tasks,
     agent_runs,
     approvals,
@@ -98,3 +99,4 @@ app.include_router(execute.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(workflows.router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
+app.include_router(memory_router.router, prefix="/api")
