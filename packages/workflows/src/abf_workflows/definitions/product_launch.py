@@ -291,6 +291,8 @@ def _risk_check(
         },
     }).execute()
 
+    if not res.data:
+        return StepOutcome(success=False, error="Failed to create approval record")
     approval_id = res.data[0]["id"]
     logger.info("Risk check: approval required (%s) → %s", reason, approval_id)
 
@@ -334,6 +336,8 @@ async def trigger(db: Any, business_id: str, input_data: dict[str, Any]) -> dict
         "input_payload": inp.model_dump(),
         "total_steps": len(steps),
     }).execute()
+    if not res.data:
+        raise ValueError("Failed to create workflow run record")
     wf_id = res.data[0]["id"]
 
     logger.info("Product launch workflow started: %s for %s", wf_id, inp.product_name)

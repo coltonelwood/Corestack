@@ -2,8 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies first for layer caching
-COPY apps/api/pyproject.toml apps/api/setup.cfg* ./apps/api/
+# Copy dependency manifests first for layer caching
+COPY apps/api/pyproject.toml ./apps/api/
 COPY packages/ai/pyproject.toml ./packages/ai/
 COPY packages/agents/pyproject.toml ./packages/agents/
 COPY packages/workflows/pyproject.toml ./packages/workflows/
@@ -26,4 +26,5 @@ RUN pip install --no-cache-dir \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "abf_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use shell form so $PORT is evaluated at runtime (Railway/Render set PORT)
+CMD uvicorn abf_api.main:app --host 0.0.0.0 --port ${PORT:-8000}

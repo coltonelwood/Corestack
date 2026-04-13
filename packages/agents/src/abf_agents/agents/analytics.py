@@ -39,7 +39,7 @@ class AnalyticsInput(BaseModel):
 
 @register
 class AnalyticsAgent(BaseAgent):
-    name = "analytics_agent"
+    name = "analytics"
     agent_type = "analytics"
     description = (
         "Summarizes campaign and business performance, identifies winners "

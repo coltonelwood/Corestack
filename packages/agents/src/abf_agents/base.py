@@ -174,6 +174,8 @@ class DBOps:
             "status": "pending",
             "payload": payload or {},
         }).execute()
+        if not res.data:
+            raise RuntimeError(f"Failed to create task: {title}")
         task_id = res.data[0]["id"]
         logger.info("Task created: %s — %s", task_id, title)
         return task_id
@@ -200,6 +202,8 @@ class DBOps:
             "amount_cents": amount_cents,
             "payload": payload or {},
         }).execute()
+        if not res.data:
+            raise RuntimeError(f"Failed to create approval: {title}")
         approval_id = res.data[0]["id"]
         logger.info("Approval created: %s — %s", approval_id, title)
         return approval_id

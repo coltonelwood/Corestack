@@ -260,6 +260,8 @@ class PersistentWorkflowRunner:
             "agent_name": agent_name,
             "status": "pending",
         }).execute()
+        if not res.data:
+            raise RuntimeError(f"Failed to create step run for {step_key}")
         return res.data[0]["id"]
 
     def _update_workflow(self, **fields: Any) -> None:

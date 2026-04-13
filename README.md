@@ -123,8 +123,7 @@ The API docs are at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 1. Go to [railway.app](https://railway.app) and create a new project
 2. Connect your GitHub repo
-3. Set the **Root Directory** to `apps/api`
-4. Railway auto-detects the `Dockerfile`
+3. Railway auto-detects the `Dockerfile` at the repo root
 5. Add environment variables:
 
    | Variable | Value |

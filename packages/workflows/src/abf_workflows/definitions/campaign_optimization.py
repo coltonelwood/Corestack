@@ -401,6 +401,8 @@ def _apply_or_approve(
             "payload": recommendation,
         }).execute()
 
+        if not res.data:
+            return StepOutcome(success=False, error="Failed to create approval record")
         approval_id = res.data[0]["id"]
         logger.info("Optimization requires approval: %s → %s", campaign_name, approval_id)
 
@@ -493,6 +495,8 @@ async def trigger(db: Any, business_id: str, input_data: dict[str, Any]) -> dict
         "input_payload": inp.model_dump(),
         "total_steps": len(steps),
     }).execute()
+    if not res.data:
+        raise ValueError("Failed to create workflow run record")
     wf_id = res.data[0]["id"]
 
     logger.info("Campaign optimization started: %s for campaign %s", wf_id, inp.campaign_id)

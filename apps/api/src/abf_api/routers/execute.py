@@ -26,7 +26,7 @@ AGENT_KEY_MAP: dict[str, str] = {
     "Content Writer": "content_writer",
     "Research Analyst": "research_analyst",
     "Ads Manager": "ads_manager",
-    "Analytics Agent": "analytics_agent",
+    "Analytics Agent": "analytics",
     "Operations Agent": "operations",
     "Outreach Agent": "outreach",
     # Core agent layer
@@ -92,6 +92,8 @@ async def execute_task(body: ExecuteRequest, db: Client = Depends(get_supabase))
         "input_payload": task.get("payload", {}),
     }
     run_res = db.table("agent_runs").insert(run_data).execute()
+    if not run_res.data:
+        raise ABFError("Failed to create agent run record", status_code=500, code="DB_ERROR")
     run_id = run_res.data[0]["id"]
 
     # Execute the agent

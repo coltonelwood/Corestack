@@ -26,7 +26,7 @@ class TestRegistry:
         assert "opportunity" in agents
         assert "decision" in agents
         assert "execution" in agents
-        assert "analytics_agent" in agents
+        assert "analytics" in agents
 
     def test_compat_agents_registered(self):
         agents = registry()
@@ -271,7 +271,7 @@ class TestAnalyticsAgent:
             }),
         ]
 
-        agent = get_agent("analytics_agent")
+        agent = get_agent("analytics")
         ctx = AgentContext(
             business_id="biz-001",
             payload={
