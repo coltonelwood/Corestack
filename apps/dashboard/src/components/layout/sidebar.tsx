@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { canAccessRoute, type Role, ROLE_LABELS, hasPermission } from "@/lib/rbac";
 import {
   LayoutDashboard,
   Building2,
@@ -34,7 +35,20 @@ const systemNav = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-function NavGroup({ label, items, pathname }: { label?: string; items: typeof mainNav; pathname: string }) {
+function NavGroup({
+  label,
+  items,
+  pathname,
+  role,
+}: {
+  label?: string;
+  items: typeof mainNav;
+  pathname: string;
+  role: Role;
+}) {
+  const visible = items.filter((item) => canAccessRoute(role, item.href));
+  if (visible.length === 0) return null;
+
   return (
     <div>
       {label && (
@@ -43,7 +57,7 @@ function NavGroup({ label, items, pathname }: { label?: string; items: typeof ma
         </p>
       )}
       <div className="flex flex-col gap-0.5">
-        {items.map((item) => {
+        {visible.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -68,7 +82,7 @@ function NavGroup({ label, items, pathname }: { label?: string; items: typeof ma
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
 
   return (
@@ -80,10 +94,15 @@ export function Sidebar() {
         <span className="text-sm font-bold tracking-tight">ABF</span>
       </div>
       <nav className="flex flex-col gap-6 p-3 pt-4">
-        <NavGroup items={mainNav} pathname={pathname} />
-        <NavGroup label="Automation" items={automationNav} pathname={pathname} />
-        <NavGroup label="System" items={systemNav} pathname={pathname} />
+        <NavGroup items={mainNav} pathname={pathname} role={role} />
+        <NavGroup label="Automation" items={automationNav} pathname={pathname} role={role} />
+        <NavGroup label="System" items={systemNav} pathname={pathname} role={role} />
       </nav>
+      <div className="absolute bottom-0 left-0 right-0 border-t px-5 py-3">
+        <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+          {ROLE_LABELS[role]}
+        </p>
+      </div>
     </aside>
   );
 }

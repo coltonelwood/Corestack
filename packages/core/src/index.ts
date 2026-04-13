@@ -31,3 +31,16 @@ export interface WorkflowStep {
   agentId: string;
   order: number;
 }
+
+// RBAC
+export {
+  ROLES,
+  ROLE_LABELS,
+  type Role,
+  type Permission,
+  hasPermission,
+  hasAllPermissions,
+  hasAnyPermission,
+  getPermissions,
+  isValidRole,
+} from "./rbac";

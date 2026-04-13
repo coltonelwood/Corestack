@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/state/empty";
 import { StatusFilter } from "@/components/ui/status-filter";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { getApprovals } from "@/app/actions/approvals";
+import { getUserWithRole } from "@/app/actions/auth";
+import { hasPermission } from "@/lib/rbac";
 import { ApprovalActions } from "./actions";
 
 type ApprovalWithBiz = Awaited<ReturnType<typeof getApprovals>>[number];
@@ -27,7 +29,7 @@ const typeLabel: Record<string, string> = {
   other: "Other",
 };
 
-const columns = [
+const baseColumns = [
   {
     header: "Request",
     cell: (row: ApprovalWithBiz) => (
@@ -81,18 +83,26 @@ const columns = [
       <span className="text-muted-foreground tabular-nums">{formatDateTime(row.created_at)}</span>
     ),
   },
-  {
+];
+
+function getActionColumn(canDecide: boolean) {
+  return {
     header: "",
-    cell: (row: ApprovalWithBiz) =>
-      row.status === "pending" ? (
-        <ApprovalActions id={row.id} />
-      ) : (
+    cell: (row: ApprovalWithBiz) => {
+      if (row.status === "pending" && canDecide) {
+        return <ApprovalActions id={row.id} />;
+      }
+      if (row.status === "pending") {
+        return <span className="text-xs text-muted-foreground">Pending</span>;
+      }
+      return (
         <span className="text-xs text-muted-foreground tabular-nums">
           {row.reviewed_at ? formatDateTime(row.reviewed_at) : ""}
         </span>
-      ),
-  },
-];
+      );
+    },
+  };
+}
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
@@ -100,7 +110,9 @@ interface Props {
 
 export default async function ApprovalsPage({ searchParams }: Props) {
   const params = await searchParams;
-  const allApprovals = await getApprovals();
+  const [allApprovals, user] = await Promise.all([getApprovals(), getUserWithRole()]);
+  const canDecide = user ? hasPermission(user.role, "approvals:decide") : false;
+  const allColumns = [...baseColumns, getActionColumn(canDecide)];
 
   const approvals = params.status
     ? allApprovals.filter((a) => a.status === params.status)
@@ -148,7 +160,7 @@ export default async function ApprovalsPage({ searchParams }: Props) {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <DataTable columns={columns} data={approvals} />
+            <DataTable columns={allColumns} data={approvals} />
           </CardContent>
         </Card>
       )}
