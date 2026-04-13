@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createDataClient } from "@/lib/supabase/data";
 
 export async function getWorkflowRuns() {

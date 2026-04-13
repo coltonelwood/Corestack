@@ -6,7 +6,7 @@ from supabase import Client
 
 from abf_api.deps.supabase import get_supabase
 from abf_api.errors import NotFoundError
-from abf_api.models.schemas import AgentRunCreate, AgentRunRead, AgentRunUpdate
+from abf_api.models.schemas import AgentRunCreate, AgentRunUpdate
 from abf_api.responses import ok, ok_list
 
 logger = logging.getLogger("abf_api.agent_runs")

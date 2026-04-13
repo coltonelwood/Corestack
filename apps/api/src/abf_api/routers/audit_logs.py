@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from supabase import Client
 
 from abf_api.deps.supabase import get_supabase
-from abf_api.models.schemas import AuditLogCreate, AuditLogRead
+from abf_api.models.schemas import AuditLogCreate
 from abf_api.responses import ok, ok_list
 
 router = APIRouter(prefix="/audit-logs", tags=["audit-logs"])

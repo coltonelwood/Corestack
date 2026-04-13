@@ -5,7 +5,7 @@ from supabase import Client
 
 from abf_api.deps.supabase import get_supabase
 from abf_api.errors import NotFoundError
-from abf_api.models.schemas import BusinessCreate, BusinessRead, BusinessUpdate
+from abf_api.models.schemas import BusinessCreate, BusinessUpdate
 from abf_api.responses import ok, ok_list
 from abf_api.services.audit import log_event
 
