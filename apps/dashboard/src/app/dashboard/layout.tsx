@@ -1,6 +1,9 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 
+// All dashboard pages fetch data at request time — no static prerendering.
+export const dynamic = "force-dynamic";
+
 export default function DashboardLayout({
   children,
 }: {

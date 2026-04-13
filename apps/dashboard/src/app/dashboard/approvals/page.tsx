@@ -1,13 +1,14 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusDot } from "@/components/ui/status-dot";
-import { approvals } from "@/data/seed";
+import { EmptyState } from "@/components/state/empty";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { CheckCircle2, XCircle } from "lucide-react";
-import type { Approval } from "@/types";
+import { getApprovals } from "@/app/actions/approvals";
+import { ApprovalActions } from "./actions";
+
+type ApprovalWithBiz = Awaited<ReturnType<typeof getApprovals>>[number];
 
 const statusVariant: Record<string, "warning" | "success" | "destructive"> = {
   pending: "warning",
@@ -21,30 +22,29 @@ const typeLabel: Record<string, string> = {
   content_publish: "Content Publish",
   product_listing: "Product Listing",
   price_change: "Price Change",
+  other: "Other",
 };
 
 const columns = [
   {
     header: "Request",
-    cell: (row: Approval) => (
+    cell: (row: ApprovalWithBiz) => (
       <div className="max-w-xs">
         <p className="font-medium">{row.title}</p>
-        <p className="text-xs text-muted-foreground truncate">
-          {row.description}
-        </p>
+        <p className="text-xs text-muted-foreground truncate">{row.description ?? ""}</p>
       </div>
     ),
   },
   {
     header: "Type",
-    cell: (row: Approval) => (
-      <Badge variant="secondary">{typeLabel[row.type]}</Badge>
+    cell: (row: ApprovalWithBiz) => (
+      <Badge variant="secondary">{typeLabel[row.type] ?? row.type}</Badge>
     ),
   },
   {
     header: "Status",
-    cell: (row: Approval) => (
-      <Badge variant={statusVariant[row.status]}>
+    cell: (row: ApprovalWithBiz) => (
+      <Badge variant={statusVariant[row.status] ?? "warning"}>
         <StatusDot status={row.status} className="mr-1.5" />
         {row.status}
       </Badge>
@@ -52,68 +52,77 @@ const columns = [
   },
   {
     header: "Requested By",
-    cell: (row: Approval) => (
-      <span className="text-muted-foreground">{row.requestedBy}</span>
+    cell: (row: ApprovalWithBiz) => (
+      <span className="text-muted-foreground">{row.requested_by}</span>
     ),
   },
   {
     header: "Business",
-    cell: (row: Approval) => (
-      <span className="text-muted-foreground">{row.businessName}</span>
+    cell: (row: ApprovalWithBiz) => (
+      <span className="text-muted-foreground">
+        {(row.businesses as { name: string } | null)?.name ?? "—"}
+      </span>
     ),
   },
   {
     header: "Amount",
-    cell: (row: Approval) => (
+    cell: (row: ApprovalWithBiz) => (
       <span className="font-medium">
-        {row.amount ? formatCurrency(row.amount) : "—"}
+        {row.amount_cents ? formatCurrency(row.amount_cents / 100) : "—"}
       </span>
     ),
     className: "text-right",
   },
   {
     header: "Submitted",
-    cell: (row: Approval) => (
-      <span className="text-muted-foreground">
-        {formatDateTime(row.createdAt)}
-      </span>
+    cell: (row: ApprovalWithBiz) => (
+      <span className="text-muted-foreground">{formatDateTime(row.created_at)}</span>
     ),
   },
   {
     header: "Actions",
-    cell: (row: Approval) =>
+    cell: (row: ApprovalWithBiz) =>
       row.status === "pending" ? (
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
-            <CheckCircle2 className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50">
-            <XCircle className="h-4 w-4" />
-          </Button>
-        </div>
+        <ApprovalActions id={row.id} />
       ) : (
         <span className="text-xs text-muted-foreground">
-          {row.reviewedAt ? formatDateTime(row.reviewedAt) : ""}
+          {row.reviewed_at ? formatDateTime(row.reviewed_at) : ""}
         </span>
       ),
   },
 ];
 
-export default function ApprovalsPage() {
+export default async function ApprovalsPage() {
+  const approvals = await getApprovals();
   const pendingCount = approvals.filter((a) => a.status === "pending").length;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Approvals"
-        description={`${pendingCount} pending approval${pendingCount !== 1 ? "s" : ""} requiring your review.`}
+        description={
+          pendingCount > 0
+            ? `${pendingCount} pending approval${pendingCount !== 1 ? "s" : ""} requiring your review.`
+            : "All approvals have been reviewed."
+        }
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <DataTable columns={columns} data={approvals} />
-        </CardContent>
-      </Card>
+      {approvals.length === 0 ? (
+        <Card>
+          <CardContent className="p-0">
+            <EmptyState
+              title="No approvals yet"
+              description="Approval requests from agents will appear here."
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <DataTable columns={columns} data={approvals} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

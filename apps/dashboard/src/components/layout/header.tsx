@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell, LogOut, Search } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { MobileSidebar } from "./mobile-sidebar";
+import { signOut } from "@/app/actions/auth";
 
 export function Header() {
   return (
@@ -24,12 +25,15 @@ export function Header() {
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
         </button>
         <div className="hidden sm:flex items-center gap-2">
-          <Avatar fallback="CE" size="sm" />
-          <div className="text-sm">
-            <p className="font-medium leading-none">Colton E.</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Admin</p>
-          </div>
+          <Avatar fallback="U" size="sm" />
         </div>
+        <button
+          onClick={() => signOut()}
+          className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+          title="Sign out"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
     </header>
   );
