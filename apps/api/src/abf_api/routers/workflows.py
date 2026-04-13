@@ -1,4 +1,4 @@
-"""Workflow endpoints — trigger, monitor, resume product launch workflows.
+"""Workflow endpoints — trigger, monitor, resume workflows.
 
 Provides both the generic workflow trigger (inline steps) and the
 specific product launch workflow with persistent DB-backed state.
@@ -35,6 +35,12 @@ class ProductLaunchRequest(BaseModel):
     budget_cents: int = 0
     market_data: str = ""
     our_strengths: str = ""
+
+class CampaignOptRequest(BaseModel):
+    business_id: str
+    campaign_id: str
+    target_cpa_cents: int = 0
+    target_roas: float = 0
 
 class ResumeRequest(BaseModel):
     workflow_run_id: str
@@ -91,30 +97,70 @@ async def trigger_product_launch(
     return ok(result)
 
 
+@router.post("/campaign-optimization")
+async def trigger_campaign_optimization(
+    body: CampaignOptRequest,
+    db: Client = Depends(get_supabase),
+):
+    """Optimize a running campaign.
+
+    Pulls metrics → analyzes KPIs → AI decides scale/hold/pause/kill
+    → validates against guardrails → auto-applies or creates approval.
+    """
+    from abf_workflows.definitions.campaign_optimization import trigger
+
+    try:
+        result = await trigger(db, body.business_id, body.model_dump())
+    except Exception as exc:
+        logger.exception("Campaign optimization workflow failed: %s", exc)
+        raise ABFError(f"Workflow failed: {exc}", status_code=500, code="WORKFLOW_ERROR")
+
+    log_event(
+        db,
+        actor="api",
+        action="workflow_trigger",
+        entity_type="workflow",
+        entity_id=result.get("workflow_run_id"),
+        business_id=body.business_id,
+        diff={
+            "type": "campaign_optimization",
+            "campaign_id": body.campaign_id,
+            "status": result.get("status"),
+        },
+    )
+
+    return ok(result)
+
+
 @router.post("/resume")
 async def resume_workflow(
     body: ResumeRequest,
     db: Client = Depends(get_supabase),
 ):
     """Resume a paused workflow after its approval has been granted."""
-    # Load the workflow to determine its type
     wf = db.table("workflow_runs").select("workflow_type").eq("id", body.workflow_run_id).maybe_single().execute()
     if not wf.data:
         raise NotFoundError("Workflow run", body.workflow_run_id)
 
     wf_type = wf.data["workflow_type"]
+    resume_fn = None
 
     if wf_type == "product_launch":
         from abf_workflows.definitions.product_launch import resume
-        try:
-            result = await resume(db, body.workflow_run_id)
-        except ValueError as exc:
-            raise ABFError(str(exc), code="WORKFLOW_RESUME_ERROR")
-        except Exception as exc:
-            logger.exception("Workflow resume failed: %s", exc)
-            raise ABFError(f"Resume failed: {exc}", status_code=500, code="WORKFLOW_ERROR")
+        resume_fn = resume
+    elif wf_type == "campaign_optimization":
+        from abf_workflows.definitions.campaign_optimization import resume
+        resume_fn = resume
     else:
         raise ABFError(f"Unsupported workflow type: {wf_type}", code="UNKNOWN_WORKFLOW")
+
+    try:
+        result = await resume_fn(db, body.workflow_run_id)
+    except ValueError as exc:
+        raise ABFError(str(exc), code="WORKFLOW_RESUME_ERROR")
+    except Exception as exc:
+        logger.exception("Workflow resume failed: %s", exc)
+        raise ABFError(f"Resume failed: {exc}", status_code=500, code="WORKFLOW_ERROR")
 
     log_event(
         db,
