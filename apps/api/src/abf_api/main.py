@@ -20,6 +20,7 @@ from abf_api.routers import (
     execute,
     ai,
     workflows,
+    integrations,
 )
 
 logger = logging.getLogger("abf_api")
@@ -96,3 +97,4 @@ app.include_router(audit_logs.router, prefix="/api")
 app.include_router(execute.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(workflows.router, prefix="/api")
+app.include_router(integrations.router, prefix="/api")

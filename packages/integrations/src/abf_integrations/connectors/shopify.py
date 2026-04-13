@@ -1,53 +1,62 @@
-"""Shopify connector — placeholder for e-commerce integration.
+"""Shopify connector — e-commerce integration.
 
-This is a scaffold. Implement methods as the Shopify integration
-is built out.
+Mock mode simulates realistic Shopify Admin API responses.
 """
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
-from abf_integrations.base import BaseConnector, ConnectorResult
+from abf_integrations.base import BaseConnector, ConnectorConfig
 
 
 class ShopifyConnector(BaseConnector):
     name = "shopify"
     service = "shopify"
 
-    def __init__(self, shop_url: str, access_token: str):
-        self.shop_url = shop_url
-        self.access_token = access_token
+    def __init__(self, config: ConnectorConfig | None = None):
+        super().__init__(config)
 
-    async def test_connection(self) -> ConnectorResult:
-        # TODO: GET /admin/api/2024-01/shop.json
-        return ConnectorResult(
-            success=True,
-            data={"shop_url": self.shop_url, "status": "placeholder"},
-        )
+    SUPPORTED_ACTIONS = {
+        "create_product", "update_product", "update_inventory",
+        "list_products", "test_connection",
+    }
 
-    async def execute(self, action: str, params: dict[str, Any]) -> ConnectorResult:
-        actions = {
-            "list_products": self._list_products,
-            "create_product": self._create_product,
-            "update_inventory": self._update_inventory,
-        }
-        handler = actions.get(action)
-        if handler is None:
-            return ConnectorResult(
-                success=False,
-                error=f"Unknown Shopify action: {action}",
-            )
-        return await handler(params)
+    REQUIRED_FIELDS: dict[str, list[str]] = {
+        "create_product": ["name"],
+        "update_product": ["product_external_id"],
+        "update_inventory": ["product_external_id", "quantity"],
+    }
 
-    async def _list_products(self, params: dict[str, Any]) -> ConnectorResult:
-        # TODO: Implement Shopify product listing
-        return ConnectorResult(success=True, data={"products": [], "source": "placeholder"})
+    def validate_params(self, action: str, params: dict[str, Any]) -> str | None:
+        if action not in self.SUPPORTED_ACTIONS:
+            return f"Unsupported action: {action}"
+        required = self.REQUIRED_FIELDS.get(action, [])
+        missing = [f for f in required if f not in params or params[f] is None]
+        if missing:
+            return f"Missing required fields for {action}: {missing}"
+        return None
 
-    async def _create_product(self, params: dict[str, Any]) -> ConnectorResult:
-        # TODO: Implement Shopify product creation
-        return ConnectorResult(success=True, data={"product_id": None, "source": "placeholder"})
+    async def _execute_mock(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        if action == "test_connection":
+            return {"connected": True, "shop": "mock-shop.myshopify.com", "mode": "mock"}
+        if action == "create_product":
+            return {
+                "product_external_id": f"shopify_prod_{uuid.uuid4().hex[:12]}",
+                "name": params.get("name"),
+                "status": "draft",
+                "mode": "mock",
+            }
+        if action == "update_inventory":
+            return {
+                "product_external_id": params["product_external_id"],
+                "new_quantity": params["quantity"],
+                "mode": "mock",
+            }
+        if action == "list_products":
+            return {"products": [], "total": 0, "mode": "mock"}
+        return {"action": action, "mode": "mock"}
 
-    async def _update_inventory(self, params: dict[str, Any]) -> ConnectorResult:
-        # TODO: Implement Shopify inventory update
-        return ConnectorResult(success=True, data={"updated": False, "source": "placeholder"})
+    async def _execute_live(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError(f"Live mode for Shopify {action} not yet implemented.")

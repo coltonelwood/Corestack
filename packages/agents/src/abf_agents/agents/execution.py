@@ -110,6 +110,27 @@ class ExecutionAgent(BaseAgent):
         }
         return handlers.get(action)
 
+    async def _dispatch_integrations(
+        self, payloads: list[dict[str, Any]], ctx: AgentContext,
+    ) -> list[dict[str, Any]]:
+        """Dispatch integration payloads and return execution results."""
+        if not payloads:
+            return []
+
+        from abf_integrations.dispatcher import dispatch_batch
+
+        results = await dispatch_batch(payloads)
+        result_dicts = [r.model_dump() for r in results]
+
+        for r in results:
+            status = "succeeded" if r.success else "failed"
+            logger.info(
+                "Integration %s.%s %s (mode=%s)",
+                r.connector, r.action, status, r.mode.value,
+            )
+
+        return result_dicts
+
     async def _launch_campaign(
         self, ctx: AgentContext, inp: ExecutionInput,
         tasks: list, approvals: list, integrations: list,
@@ -146,7 +167,7 @@ class ExecutionAgent(BaseAgent):
         )
         tasks.append(t2)
 
-        # 3. Prepare integration payload
+        # 3. Dispatch integration: create campaign on the ad platform
         integration_payload = {
             "integration": inp.integration_target or inp.channel,
             "action": "create_campaign",
@@ -158,14 +179,15 @@ class ExecutionAgent(BaseAgent):
             },
         }
         integrations.append(integration_payload)
+        integration_results = await self._dispatch_integrations(integrations, ctx)
 
         return AgentResult(
             output={
                 "status": "tasks_created",
                 "action": inp.action,
                 "tasks_created": tasks,
-                "integration_payloads": integrations,
-                "message": f"Campaign launch broken into {len(tasks)} tasks.",
+                "integration_results": integration_results,
+                "message": f"Campaign launch: {len(tasks)} tasks created, {len(integration_results)} integrations dispatched.",
             },
             tasks_created=tasks,
         )
@@ -234,24 +256,28 @@ class ExecutionAgent(BaseAgent):
         self, ctx: AgentContext, inp: ExecutionInput,
         tasks: list, approvals: list, integrations: list,
     ) -> AgentResult:
-        """Prepare a budget scaling payload for the ad platform."""
+        """Scale a campaign budget via the integration layer."""
+        new_budget = int(inp.budget_cents * (1 + inp.budget_change_pct / 100))
         integration_payload = {
             "integration": inp.integration_target or inp.channel,
             "action": "update_budget",
             "params": {
+                "campaign_external_id": inp.extra.get("campaign_external_id", ""),
                 "campaign_name": inp.campaign_name,
+                "current_budget_cents": inp.budget_cents,
+                "new_budget_cents": new_budget,
                 "budget_change_pct": inp.budget_change_pct,
-                "new_budget_cents": int(inp.budget_cents * (1 + inp.budget_change_pct / 100)),
             },
         }
         integrations.append(integration_payload)
+        integration_results = await self._dispatch_integrations(integrations, ctx)
 
         return AgentResult(
             output={
-                "status": "ready_to_execute",
+                "status": "executed",
                 "action": inp.action,
-                "integration_payloads": integrations,
-                "message": f"Budget scaling payload prepared ({inp.budget_change_pct:+.0f}%).",
+                "integration_results": integration_results,
+                "message": f"Budget scaled {inp.budget_change_pct:+.0f}% → ${new_budget/100:,.0f}.",
             },
         )
 

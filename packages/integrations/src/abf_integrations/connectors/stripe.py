@@ -1,37 +1,54 @@
-"""Stripe connector — placeholder for payment integration."""
+"""Stripe connector — payment integration.
+
+Mock mode simulates realistic Stripe API responses.
+"""
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
-from abf_integrations.base import BaseConnector, ConnectorResult
+from abf_integrations.base import BaseConnector, ConnectorConfig
 
 
 class StripeConnector(BaseConnector):
     name = "stripe"
     service = "stripe"
 
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self, config: ConnectorConfig | None = None):
+        super().__init__(config)
 
-    async def test_connection(self) -> ConnectorResult:
-        # TODO: GET /v1/balance
-        return ConnectorResult(success=True, data={"status": "placeholder"})
+    SUPPORTED_ACTIONS = {"get_balance", "list_charges", "create_refund", "test_connection"}
 
-    async def execute(self, action: str, params: dict[str, Any]) -> ConnectorResult:
-        actions = {
-            "get_balance": self._get_balance,
-            "list_charges": self._list_charges,
-        }
-        handler = actions.get(action)
-        if handler is None:
-            return ConnectorResult(success=False, error=f"Unknown Stripe action: {action}")
-        return await handler(params)
+    REQUIRED_FIELDS: dict[str, list[str]] = {
+        "create_refund": ["charge_id", "amount_cents"],
+    }
 
-    async def _get_balance(self, params: dict[str, Any]) -> ConnectorResult:
-        # TODO: Implement Stripe balance retrieval
-        return ConnectorResult(success=True, data={"balance_cents": 0, "source": "placeholder"})
+    def validate_params(self, action: str, params: dict[str, Any]) -> str | None:
+        if action not in self.SUPPORTED_ACTIONS:
+            return f"Unsupported action: {action}"
+        required = self.REQUIRED_FIELDS.get(action, [])
+        missing = [f for f in required if f not in params or params[f] is None]
+        if missing:
+            return f"Missing required fields for {action}: {missing}"
+        return None
 
-    async def _list_charges(self, params: dict[str, Any]) -> ConnectorResult:
-        # TODO: Implement Stripe charge listing
-        return ConnectorResult(success=True, data={"charges": [], "source": "placeholder"})
+    async def _execute_mock(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        if action == "test_connection":
+            return {"connected": True, "mode": "mock"}
+        if action == "get_balance":
+            return {"available_cents": 2845000, "pending_cents": 48200, "currency": "usd", "mode": "mock"}
+        if action == "list_charges":
+            return {"charges": [], "has_more": False, "mode": "mock"}
+        if action == "create_refund":
+            return {
+                "refund_id": f"re_{uuid.uuid4().hex[:16]}",
+                "charge_id": params["charge_id"],
+                "amount_cents": params["amount_cents"],
+                "status": "succeeded",
+                "mode": "mock",
+            }
+        return {"action": action, "mode": "mock"}
+
+    async def _execute_live(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError(f"Live mode for Stripe {action} not yet implemented.")
