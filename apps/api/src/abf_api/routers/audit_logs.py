@@ -3,11 +3,12 @@ from supabase import Client
 
 from abf_api.deps.supabase import get_supabase
 from abf_api.models.schemas import AuditLogCreate, AuditLogRead
+from abf_api.responses import ok, ok_list
 
 router = APIRouter(prefix="/audit-logs", tags=["audit-logs"])
 
 
-@router.get("", response_model=list[AuditLogRead])
+@router.get("")
 def list_audit_logs(
     business_id: str | None = None,
     entity_type: str | None = None,
@@ -22,11 +23,11 @@ def list_audit_logs(
         q = q.eq("entity_type", entity_type)
     if entity_id:
         q = q.eq("entity_id", entity_id)
-    return q.execute().data
+    return ok_list(q.execute().data)
 
 
-@router.post("", response_model=AuditLogRead, status_code=201)
+@router.post("", status_code=201)
 def create_audit_log(body: AuditLogCreate, db: Client = Depends(get_supabase)):
     data = body.model_dump(exclude_none=True)
     res = db.table("audit_logs").insert(data).execute()
-    return res.data[0]
+    return ok(res.data[0])
