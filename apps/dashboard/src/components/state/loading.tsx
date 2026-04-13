@@ -6,9 +6,9 @@ interface LoadingStateProps {
 
 export function LoadingState({ message = "Loading..." }: LoadingStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-      <Loader2 className="h-8 w-8 animate-spin" />
-      <p className="mt-3 text-sm">{message}</p>
+    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+      <Loader2 className="h-6 w-6 animate-spin" />
+      <p className="mt-2 text-xs">{message}</p>
     </div>
   );
 }
