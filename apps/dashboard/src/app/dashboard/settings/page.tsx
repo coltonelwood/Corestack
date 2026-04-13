@@ -2,7 +2,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getUser } from "@/app/actions/auth";
+import { Badge } from "@/components/ui/badge";
+import { getUserWithRole } from "@/app/actions/auth";
+import { ROLE_LABELS } from "@/lib/rbac";
+import Link from "next/link";
 
 function SettingsSection({
   title,
@@ -47,13 +50,13 @@ function FieldRow({
 }
 
 export default async function SettingsPage() {
-  const user = await getUser();
+  const user = await getUserWithRole();
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Manage your platform configuration."
+        description="Manage your account and platform configuration."
       />
 
       <div className="space-y-6 max-w-3xl">
@@ -62,32 +65,25 @@ export default async function SettingsPage() {
             <FieldRow label="Email">
               <Input defaultValue={user?.email ?? ""} type="email" disabled />
             </FieldRow>
-            <FieldRow label="User ID">
-              <Input defaultValue={user?.id ?? ""} disabled />
+            <FieldRow label="Role">
+              <Badge variant="default">{user ? ROLE_LABELS[user.role] : "Viewer"}</Badge>
             </FieldRow>
           </div>
         </SettingsSection>
 
         <SettingsSection
-          title="API Keys"
-          description="Manage external service credentials."
+          title="Integrations"
+          description="External service connections and API keys."
         >
-          <div className="space-y-0">
-            <FieldRow label="OpenAI API Key" description="Used for content generation and analysis.">
-              <Input type="password" placeholder="sk-..." />
-            </FieldRow>
-            <FieldRow label="Anthropic API Key" description="Used for agent reasoning and planning.">
-              <Input type="password" placeholder="sk-ant-..." />
-            </FieldRow>
-            <FieldRow label="Meta Marketing API" description="For Meta/Facebook ad management.">
-              <Input placeholder="Enter token..." />
-            </FieldRow>
-            <FieldRow label="Google Ads API" description="For Google Ads campaign management.">
-              <Input placeholder="Enter token..." />
-            </FieldRow>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button>Save Keys</Button>
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground">
+              Manage integration connections, credentials, and provider status on the dedicated integrations page.
+            </p>
+            <div className="mt-3">
+              <Link href="/dashboard/integrations">
+                <Button variant="outline" size="sm">Manage Integrations</Button>
+              </Link>
+            </div>
           </div>
         </SettingsSection>
 

@@ -601,6 +601,54 @@ export interface Database {
         };
         Relationships: [];
       };
+      integration_connections: {
+        Row: {
+          id: string;
+          provider: string;
+          display_name: string;
+          enabled: boolean;
+          status: string;
+          credential_key: string | null;
+          masked_key: string | null;
+          config: Json;
+          source: string;
+          last_tested_at: string | null;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          provider: string;
+          display_name: string;
+          enabled?: boolean;
+          status?: string;
+          credential_key?: string | null;
+          masked_key?: string | null;
+          config?: Json;
+          source?: string;
+          last_tested_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          provider?: string;
+          display_name?: string;
+          enabled?: boolean;
+          status?: string;
+          credential_key?: string | null;
+          masked_key?: string | null;
+          config?: Json;
+          source?: string;
+          last_tested_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

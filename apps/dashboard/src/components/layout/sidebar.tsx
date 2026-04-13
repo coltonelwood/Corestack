@@ -32,6 +32,7 @@ const automationNav = [
 ];
 
 const systemNav = [
+  { name: "Integrations", href: "/dashboard/integrations", icon: Zap },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

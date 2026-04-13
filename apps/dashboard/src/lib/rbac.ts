@@ -43,6 +43,7 @@ export const NAV_PERMISSIONS: Record<string, Permission | null> = {
   "/dashboard/agent-runs": "agent_runs:read",
   "/dashboard/workflows": "workflows:read",
   "/dashboard/approvals": "approvals:read",
+  "/dashboard/integrations": "integrations:read",
   "/dashboard/settings": "settings:read",
 };
 
