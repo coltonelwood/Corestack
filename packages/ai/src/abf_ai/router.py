@@ -45,6 +45,9 @@ class RouteConfig(BaseModel):
     max_tokens: int = 2048
     max_retries: int = 3
     retry_delay: float = 1.0
+    timeout: float = 60.0
+    fallback_provider: Provider | None = None
+    fallback_model: str | None = None
 
 
 # The table. Change a model by editing one line.
@@ -300,14 +303,30 @@ async def route_ai_task(
     for attempt in range(config.max_retries):
         attempts = attempt + 1
         try:
-            completion = await complete(
-                user_prompt,
-                system=system_prompt,
-                provider=config.provider,
-                model=config.model,
-                max_tokens=config.max_tokens,
-                temperature=config.temperature,
-            )
+            if config.fallback_provider and attempt == config.max_retries - 1:
+                # Last attempt: use fallback provider if configured
+                from abf_ai.providers import complete_with_fallback
+                completion = await complete_with_fallback(
+                    user_prompt,
+                    system=system_prompt,
+                    primary=config.provider,
+                    fallback=config.fallback_provider,
+                    model=config.model,
+                    fallback_model=config.fallback_model,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                    timeout=config.timeout,
+                )
+            else:
+                completion = await complete(
+                    user_prompt,
+                    system=system_prompt,
+                    provider=config.provider,
+                    model=config.model,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                    timeout=config.timeout,
+                )
 
             # Extract and validate JSON
             raw_data = _extract_json(completion.text)
@@ -345,6 +364,12 @@ async def route_ai_task(
             logger.warning(
                 "AI task retry %d/%d (validation): type=%s error=%s",
                 attempt + 1, config.max_retries, task_type, last_error,
+            )
+        except asyncio.TimeoutError:
+            last_error = f"Timeout after {config.timeout}s"
+            logger.warning(
+                "AI task retry %d/%d (timeout): type=%s",
+                attempt + 1, config.max_retries, task_type,
             )
         except Exception as exc:
             last_error = f"Provider error: {exc}"

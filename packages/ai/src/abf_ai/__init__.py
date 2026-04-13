@@ -1,6 +1,14 @@
 """ABF AI — AI/ML models, prompt management, task routing, and memory."""
 
-from abf_ai.providers import complete, Provider, CompletionResult
+from abf_ai.providers import (
+    complete,
+    complete_with_fallback,
+    check_provider_health,
+    estimate_cost,
+    Provider,
+    CompletionResult,
+    ProviderHealth,
+)
 from abf_ai.prompts import PromptTemplate
 from abf_ai.router import route_ai_task, TaskResult, ROUTING_TABLE, SAMPLE_PAYLOADS
 from abf_ai.schemas import TASK_SCHEMAS
@@ -19,15 +27,18 @@ from abf_ai.memory import (
 
 __all__ = [
     "complete",
+    "complete_with_fallback",
+    "check_provider_health",
+    "estimate_cost",
     "Provider",
     "CompletionResult",
+    "ProviderHealth",
     "PromptTemplate",
     "route_ai_task",
     "TaskResult",
     "ROUTING_TABLE",
     "SAMPLE_PAYLOADS",
     "TASK_SCHEMAS",
-    # Memory
     "save_memory",
     "recall_memory",
     "MemoryEntry",

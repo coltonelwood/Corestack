@@ -217,7 +217,77 @@ def get_task_schema(task_type: TaskType):
 
 
 # ═════════════════════════════════════════════════════════════
-#  Existing endpoints (completions + templates)
+#  Provider health checks
+# ═════════════════════════════════════════════════════════════
+
+@router.get("/health")
+async def ai_health():
+    """Check health of all AI providers.
+
+    Returns connectivity status, API key presence, and latency for
+    each provider. Does NOT count toward billing in mock/test mode.
+    """
+    from abf_ai.providers import check_provider_health, Provider
+
+    results = {}
+    for provider in Provider:
+        health = await check_provider_health(provider)
+        results[provider.value] = health.model_dump()
+
+    all_ok = all(r["available"] for r in results.values())
+
+    return ok({
+        "status": "ok" if all_ok else "degraded",
+        "providers": results,
+    })
+
+
+@router.post("/test")
+async def test_ai_task(
+    body: RouteRequest,
+    db: Client = Depends(get_supabase),
+):
+    """Test an AI task with debug information.
+
+    Same as /ai/route but includes the raw LLM response text and
+    the rendered prompt for debugging. Not for production use.
+    """
+    from abf_ai.router import route_ai_task, ROUTING_TABLE, SYSTEM_PROMPTS
+    from abf_ai.schemas import get_schema_json
+    import json as _json
+
+    config = ROUTING_TABLE.get(body.task_type)
+    if not config:
+        raise ABFError(f"Unknown task type: {body.task_type}", code="UNKNOWN_TASK_TYPE")
+
+    # Show the exact prompt that will be sent
+    schema_json = get_schema_json(body.task_type)
+    rendered_prompt = (
+        f"Task type: {body.task_type}\n\n"
+        f"Input data:\n{_json.dumps(body.payload, indent=2)}\n\n"
+        f"Required output JSON schema:\n{schema_json}\n\n"
+        "Respond ONLY with valid JSON matching the schema above."
+    )
+
+    result = await route_ai_task(body.task_type, body.payload)
+
+    return ok({
+        "result": result.model_dump(),
+        "debug": {
+            "provider": config.provider.value,
+            "model": config.model,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+            "timeout": config.timeout,
+            "system_prompt": SYSTEM_PROMPTS.get(body.task_type, ""),
+            "rendered_prompt_preview": rendered_prompt[:500],
+            "has_fallback": config.fallback_provider is not None,
+        },
+    })
+
+
+# ═════════════════════════════════════════════════════════════
+#  Completions + templates
 # ═════════════════════════════════════════════════════════════
 
 @router.post("/completions")
