@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusDot } from "@/components/ui/status-dot";
 import { EmptyState } from "@/components/state/empty";
+import { StatusFilter } from "@/components/ui/status-filter";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { getApprovals } from "@/app/actions/approvals";
 import { ApprovalActions } from "./actions";
@@ -51,7 +53,7 @@ const columns = [
     ),
   },
   {
-    header: "Requested By",
+    header: "From",
     cell: (row: ApprovalWithBiz) => (
       <span className="text-muted-foreground">{row.requested_by}</span>
     ),
@@ -67,7 +69,7 @@ const columns = [
   {
     header: "Amount",
     cell: (row: ApprovalWithBiz) => (
-      <span className="font-medium">
+      <span className="font-medium tabular-nums">
         {row.amount_cents ? formatCurrency(row.amount_cents / 100) : "—"}
       </span>
     ),
@@ -76,42 +78,69 @@ const columns = [
   {
     header: "Submitted",
     cell: (row: ApprovalWithBiz) => (
-      <span className="text-muted-foreground">{formatDateTime(row.created_at)}</span>
+      <span className="text-muted-foreground tabular-nums">{formatDateTime(row.created_at)}</span>
     ),
   },
   {
-    header: "Actions",
+    header: "",
     cell: (row: ApprovalWithBiz) =>
       row.status === "pending" ? (
         <ApprovalActions id={row.id} />
       ) : (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {row.reviewed_at ? formatDateTime(row.reviewed_at) : ""}
         </span>
       ),
   },
 ];
 
-export default async function ApprovalsPage() {
-  const approvals = await getApprovals();
-  const pendingCount = approvals.filter((a) => a.status === "pending").length;
+interface Props {
+  searchParams: Promise<{ status?: string }>;
+}
+
+export default async function ApprovalsPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const allApprovals = await getApprovals();
+
+  const approvals = params.status
+    ? allApprovals.filter((a) => a.status === params.status)
+    : allApprovals;
+
+  const counts = {
+    all: allApprovals.length,
+    pending: allApprovals.filter((a) => a.status === "pending").length,
+    approved: allApprovals.filter((a) => a.status === "approved").length,
+    rejected: allApprovals.filter((a) => a.status === "rejected").length,
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Approvals"
         description={
-          pendingCount > 0
-            ? `${pendingCount} pending approval${pendingCount !== 1 ? "s" : ""} requiring your review.`
+          counts.pending > 0
+            ? `${counts.pending} pending approval${counts.pending !== 1 ? "s" : ""} requiring your review.`
             : "All approvals have been reviewed."
         }
+        badge={counts.pending > 0 ? <Badge variant="warning">{counts.pending} pending</Badge> : undefined}
       />
+
+      <Suspense>
+        <StatusFilter
+          options={[
+            { label: "All", value: "", count: counts.all },
+            { label: "Pending", value: "pending", count: counts.pending },
+            { label: "Approved", value: "approved", count: counts.approved },
+            { label: "Rejected", value: "rejected", count: counts.rejected },
+          ]}
+        />
+      </Suspense>
 
       {approvals.length === 0 ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState
-              title="No approvals yet"
+              title={params.status ? `No ${params.status} approvals` : "No approvals yet"}
               description="Approval requests from agents will appear here."
             />
           </CardContent>

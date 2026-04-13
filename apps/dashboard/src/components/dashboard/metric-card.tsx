@@ -37,38 +37,36 @@ export function MetricCard({
   const Icon = iconMap[icon] ?? DollarSign;
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Icon className="h-4 w-4 text-primary" />
+    <Card className="relative overflow-hidden">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
+            <p className="text-3xl font-bold tracking-tight">{value}</p>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <Icon className="h-5 w-5 text-primary" />
           </div>
         </div>
-        <div className="mt-3">
-          <p className="text-2xl font-bold tracking-tight">{value}</p>
-          <div className="mt-1 flex items-center gap-1 text-xs">
-            {changeType === "positive" && (
-              <TrendingUp className="h-3 w-3 text-emerald-600" />
-            )}
-            {changeType === "negative" && (
-              <TrendingDown className="h-3 w-3 text-red-500" />
-            )}
-            {changeType === "neutral" && (
-              <Minus className="h-3 w-3 text-muted-foreground" />
-            )}
-            <span
-              className={cn(
-                "font-medium",
-                changeType === "positive" && "text-emerald-600",
-                changeType === "negative" && "text-red-500",
-                changeType === "neutral" && "text-muted-foreground"
-              )}
-            >
+        <div className="mt-3 flex items-center gap-1.5 text-xs">
+          {changeType === "positive" && (
+            <span className="flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
+              <TrendingUp className="h-3 w-3" />
               {change}
             </span>
-            <span className="text-muted-foreground">vs last month</span>
-          </div>
+          )}
+          {changeType === "negative" && (
+            <span className="flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 font-medium text-red-600">
+              <TrendingDown className="h-3 w-3" />
+              {change}
+            </span>
+          )}
+          {changeType === "neutral" && (
+            <span className="flex items-center gap-0.5 text-muted-foreground">
+              <Minus className="h-3 w-3" />
+              {change}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>

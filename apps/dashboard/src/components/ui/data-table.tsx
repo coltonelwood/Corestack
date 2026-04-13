@@ -22,12 +22,12 @@ export function DataTable<T extends { id: string }>({
     <div className={cn("overflow-x-auto", className)}>
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b text-left">
+          <tr className="border-b bg-muted/40 text-left">
             {columns.map((col) => (
               <th
                 key={col.header}
                 className={cn(
-                  "whitespace-nowrap px-4 py-3 font-medium text-muted-foreground",
+                  "whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground",
                   col.className
                 )}
               >
@@ -36,16 +36,16 @@ export function DataTable<T extends { id: string }>({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y">
           {data.map((row) => (
             <tr
               key={row.id}
-              className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+              className="hover:bg-muted/30 transition-colors"
             >
               {columns.map((col) => (
                 <td
                   key={col.header}
-                  className={cn("whitespace-nowrap px-4 py-3", col.className)}
+                  className={cn("whitespace-nowrap px-4 py-3.5", col.className)}
                 >
                   {col.cell
                     ? col.cell(row)
@@ -58,6 +58,11 @@ export function DataTable<T extends { id: string }>({
           ))}
         </tbody>
       </table>
+      {data.length > 0 && (
+        <div className="border-t px-4 py-2.5 text-xs text-muted-foreground bg-muted/20">
+          {data.length} {data.length === 1 ? "record" : "records"}
+        </div>
+      )}
     </div>
   );
 }
