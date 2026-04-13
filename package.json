@@ -1,0 +1,15 @@
+{
+  "name": "autonomous-business-factory",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev --filter=@abf/dashboard",
+    "dev:api": "cd apps/api && uvicorn abf_api.main:app --reload --port 8000",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0"
+  },
+  "packageManager": "pnpm@9.10.0"
+}
