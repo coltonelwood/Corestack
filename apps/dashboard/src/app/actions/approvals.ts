@@ -16,16 +16,19 @@ export async function getApprovals() {
 
 export async function approveApproval(id: string) {
   const supabase = createDataClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("approvals")
     .update({
       status: "approved" as const,
       reviewed_by: "admin",
       reviewed_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "pending" as const)
+    .select();
 
   if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Approval is no longer pending" };
 
   revalidatePath("/dashboard/approvals");
   revalidatePath("/dashboard");
@@ -34,16 +37,19 @@ export async function approveApproval(id: string) {
 
 export async function rejectApproval(id: string) {
   const supabase = createDataClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("approvals")
     .update({
       status: "rejected" as const,
       reviewed_by: "admin",
       reviewed_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "pending" as const)
+    .select();
 
   if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Approval is no longer pending" };
 
   revalidatePath("/dashboard/approvals");
   revalidatePath("/dashboard");

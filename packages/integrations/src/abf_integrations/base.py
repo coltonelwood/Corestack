@@ -113,6 +113,7 @@ class BaseConnector(ABC):
         # Execute with retries
         last_error: str | None = None
         retries = 0
+        start = time.perf_counter()
 
         for attempt in range(self.config.max_retries):
             retries = attempt
