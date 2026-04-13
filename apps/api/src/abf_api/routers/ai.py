@@ -1,7 +1,8 @@
-"""AI endpoints — completions and prompt template management.
+"""AI endpoints — task routing, completions, and prompt templates.
 
 All AI calls flow through the backend. The frontend never calls
-LLM providers directly.
+LLM providers directly. The primary entry point is POST /ai/route
+which handles model selection, retries, and output validation.
 """
 
 import logging
@@ -21,7 +22,51 @@ logger = logging.getLogger("abf_api.ai")
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-# ── Schemas ──────────────────────────────────────────────────
+# ── Task type literal ────────────────────────────────────────
+
+TaskType = Literal[
+    "decisioning",
+    "prioritization",
+    "opportunity_scoring",
+    "campaign_scaling",
+    "content_generation",
+    "landing_page_copy",
+    "ad_copy",
+    "summarization",
+    "classification",
+]
+
+
+# ── Route endpoint schemas ───────────────────────────────────
+
+class RouteRequest(BaseModel):
+    task_type: TaskType
+    payload: dict[str, Any]
+    business_id: str | None = None
+
+class RouteResponse(BaseModel):
+    task_type: str
+    success: bool
+    data: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    provider: str = ""
+    model: str = ""
+    tokens_used: int = 0
+    cost_cents: int = 0
+    duration_ms: int = 0
+    retries: int = 0
+
+class RoutingInfo(BaseModel):
+    task_type: str
+    provider: str
+    model: str
+    temperature: float
+    max_tokens: int
+    max_retries: int
+    schema_fields: list[str]
+
+
+# ── Completion endpoint schemas ──────────────────────────────
 
 class CompletionRequest(BaseModel):
     prompt: str
@@ -53,14 +98,134 @@ class TemplateInfo(BaseModel):
     template: str
 
 
-# ── Endpoints ────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════
+#  POST /ai/route  — THE PRIMARY ENTRY POINT
+# ═════════════════════════════════════════════════════════════
+
+@router.post("/route")
+async def route_task(
+    body: RouteRequest,
+    db: Client = Depends(get_supabase),
+):
+    """Route an AI task to the correct model.
+
+    This is the primary way to invoke AI in ABF. It:
+    1. Selects the right provider and model based on task_type
+    2. Builds a task-specific prompt with the output schema injected
+    3. Calls the LLM with retry logic (up to 3 attempts)
+    4. Validates the response against a strict Pydantic schema
+    5. Returns structured JSON with cost/latency metadata
+
+    Routing rules:
+    - GPT-4o → decisioning, prioritization, opportunity_scoring, campaign_scaling
+    - Claude Sonnet → content_generation, landing_page_copy, ad_copy
+    - GPT-4o-mini → summarization, classification
+    """
+    from abf_ai.router import route_ai_task
+
+    result = await route_ai_task(body.task_type, body.payload)
+
+    # Audit log
+    if body.business_id:
+        log_event(
+            db,
+            actor="ai_router",
+            action=f"ai_task:{body.task_type}",
+            entity_type="ai",
+            business_id=body.business_id,
+            diff={
+                "task_type": result.task_type,
+                "success": result.success,
+                "provider": result.provider,
+                "model": result.model,
+                "tokens_used": result.tokens_used,
+                "cost_cents": result.cost_cents,
+                "duration_ms": result.duration_ms,
+                "retries": result.retries,
+            },
+        )
+
+    if not result.success:
+        logger.warning(
+            "AI route failed: type=%s error=%s",
+            body.task_type, result.error,
+        )
+
+    return ok(RouteResponse(
+        task_type=result.task_type,
+        success=result.success,
+        data=result.data,
+        error=result.error,
+        provider=result.provider,
+        model=result.model,
+        tokens_used=result.tokens_used,
+        cost_cents=result.cost_cents,
+        duration_ms=result.duration_ms,
+        retries=result.retries,
+    ).model_dump())
+
+
+# ═════════════════════════════════════════════════════════════
+#  GET /ai/route/config — inspect the routing table
+# ═════════════════════════════════════════════════════════════
+
+@router.get("/route/config")
+def get_routing_config():
+    """Return the full routing table: which model handles which task type."""
+    from abf_ai.router import ROUTING_TABLE
+    from abf_ai.schemas import TASK_SCHEMAS
+
+    configs = []
+    for task_type, config in ROUTING_TABLE.items():
+        schema_cls = TASK_SCHEMAS.get(task_type)
+        fields = list(schema_cls.model_fields.keys()) if schema_cls else []
+        configs.append(RoutingInfo(
+            task_type=task_type,
+            provider=config.provider.value,
+            model=config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            max_retries=config.max_retries,
+            schema_fields=fields,
+        ).model_dump())
+    return ok_list(configs)
+
+
+# ═════════════════════════════════════════════════════════════
+#  GET /ai/route/samples — sample payloads for each task type
+# ═════════════════════════════════════════════════════════════
+
+@router.get("/route/samples")
+def get_sample_payloads():
+    """Return sample payloads for each task type (useful for docs/testing)."""
+    from abf_ai.router import SAMPLE_PAYLOADS
+    return ok(SAMPLE_PAYLOADS)
+
+
+# ═════════════════════════════════════════════════════════════
+#  GET /ai/route/schema/{task_type} — output schema for a task
+# ═════════════════════════════════════════════════════════════
+
+@router.get("/route/schema/{task_type}")
+def get_task_schema(task_type: TaskType):
+    """Return the JSON schema that the LLM output must conform to."""
+    from abf_ai.schemas import TASK_SCHEMAS
+    schema_cls = TASK_SCHEMAS.get(task_type)
+    if schema_cls is None:
+        raise ABFError(f"Unknown task type: {task_type}", code="UNKNOWN_TASK_TYPE")
+    return ok(schema_cls.model_json_schema())
+
+
+# ═════════════════════════════════════════════════════════════
+#  Existing endpoints (completions + templates)
+# ═════════════════════════════════════════════════════════════
 
 @router.post("/completions")
 async def create_completion(
     body: CompletionRequest,
     db: Client = Depends(get_supabase),
 ):
-    """Run an ad-hoc LLM completion. All AI calls flow through this endpoint."""
+    """Run an ad-hoc LLM completion (no schema validation)."""
     from abf_ai.providers import complete, Provider
 
     try:
@@ -142,10 +307,7 @@ async def render_template(
     try:
         rendered = template.render(**body.variables)
     except KeyError as exc:
-        raise ABFError(
-            f"Missing template variable: {exc}",
-            code="MISSING_VARIABLE",
-        )
+        raise ABFError(f"Missing template variable: {exc}", code="MISSING_VARIABLE")
 
     try:
         provider = Provider(body.provider)
